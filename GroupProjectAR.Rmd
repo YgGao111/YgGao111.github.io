@@ -1,0 +1,96 @@
+---
+title: "ProjectR"
+author: "YgGao111"
+date: "2024-08-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# download data set - cheese
+tuesdata <- tidytuesdayR::tt_load('2024-06-04')
+# library:
+library(dplyr)
+library(ggmap)
+library(stringr)
+library(ggplot2)
+library(maps)
+```
+
+## R Markdown
+About cheese: 
+contains origin countries of cheeses, flavor, aroma, fat content,
+milk type of different cheese types.
+
+```{r load dataset, echo = T}
+# Load data set and show summary of the data set:
+cheeses <- tuesdata$cheeses
+summary(cheeses)
+View(cheeses)
+milktps <- distinct(cheeses, milk)
+print(milktps)
+# lots milk types used to make cheeses, here we first looked these three milk types
+milktp <- c("cow","goat","sheep")
+our_cheese <- cheeses %>% filter(milk %in% milktp, !is.na(country))
+```
+
+Number of cheese types in different origin countries:
+
+```{r, overview of cheese types over world, echo = T}
+# how many cheese types produced by each origin country
+# find countries produced 
+origins <- unlist(unique(our_cheese$country)) 
+origins <- str_split(origins,", ") %>% unlist() %>% unique()
+tps_cheese <- NULL
+for (org in origins){
+  tps_cheese[org] <- nrow(filter(our_cheese, grepl(org,country)))
+}
+tps_cheese <- tps_cheese[tps_cheese != 0]
+data_df <- data.frame(
+  region = names(tps_cheese),
+  value = unlist(tps_cheese)
+)
+```
+
+
+```{r, showed in world map, echo = T}
+# use map to show distribution of cheese types
+world_map <- map_data("world")
+country_centroids <- map_data("world") %>%
+  group_by(region) %>%
+  summarize(long = mean(long), lat = mean(lat))
+country_data <- country_centroids %>%
+  filter(region %in% names(tps_cheese))
+# use left_join() combine Geo_country info with number of cheese types
+joined_data <- left_join(country_data, data_df, by = "region")
+```
+
+## Including Plots: show number of cheese types created in diff countries
+
+embed plots:
+```{r, plot in maps, echo = FALSE}
+ggplot() +
+  geom_polygon(data = world_map, aes(x = long, y = lat, group = group), fill = "lightblue", color = "white") +
+  geom_point(data = joined_data, aes(x = long, y = lat, size = value), color = "black") +
+  theme_minimal()+
+  labs(size = "Number of cheese types")
+```
+
+```{r, milk type, echo = T}
+# find most popular milk type (sheep, cow, goat) to make cheese
+milk_pop <- NULL
+for (mk in milktp){
+  data <- our_cheese %>% filter(milk == mk)
+  origins <- unlist(unique(data$country)) 
+  origins <- str_split(origins,", ") %>% unlist() %>% unique()
+  milk_pop[mk] <- length(origins)
+}
+```
+
+```{r, include plot: milktyp in diff origin countries, echo = FALSE}
+# plot: to find popular milk type to make cheese: 
+barplot(milk_pop, names.arg = milktp, 
+        main = "Popularity of MilkTypes to make cheeses", 
+        xlab = "Milk type for cheese")
+```
+
